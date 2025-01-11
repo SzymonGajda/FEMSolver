@@ -1,8 +1,12 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from collections.abc import Callable
+
+from matplotlib import animation
 from numpy.ma.core import logical_or
 import scipy.integrate as integrate
+import FDM
 
 
 class Boundary:
@@ -50,21 +54,27 @@ def two_sided_hat_function_derivative(x: float, beginning: np.float64, node: np.
 
 
 def get_rode_cross_section_area(x):
-    return 0.1
-    # return 1
-
-
-def get_rode_conductivity(x):
-    # return 0.1*(5-0.6*x)
+    # return 0.1
     return 1
 
 
-def get_heat_source_function(x):
-    # return 0.03*pow(x-6, 4)
+def get_rode_conductivity(x):
+    return 0.1 * (5 - 0.6 * x)
+
+
+# return 1
+
+
+def get_heat_source_function(x, t):
+    return 2 * x
     # if logical_or(x < 2,  x > 4):
     #    return 0
     # return 1
-    return np.where(logical_or(x < 1, x > 2), 0, 0.1)
+    # return np.where(logical_or(x < 1, x > 2), 0, 0.1)
+
+
+def get_initial_temperature(x, t=0):
+    return 0.5 - abs(x - 0.5)
 
 
 def get_mass_matrix(mesh):
@@ -78,47 +88,48 @@ def get_mass_matrix(mesh):
     return res
 
 
-def get_stiffness_matrix(mesh):
+def get_stiffness_matrix(mesh, integrate_fun):
     res = np.zeros((mesh.mesh.size, mesh.mesh.size))
-    res[0, 0] += integrate.quad(lambda x:
-                                (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
-                                 one_sided_hat_function_derivative(x, mesh.mesh[0], mesh.mesh[1], 1) *
-                                 one_sided_hat_function_derivative(x, mesh.mesh[0], mesh.mesh[1], 1)), mesh.mesh[0],
-                                mesh.mesh[1])[0]
-    res[-1, -1] += integrate.quad(lambda x:
-                                  (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
-                                   one_sided_hat_function_derivative(x, mesh.mesh[-1], mesh.mesh[-2], 1) *
-                                   one_sided_hat_function_derivative(x, mesh.mesh[-1], mesh.mesh[-2], 1)),
-                                  mesh.mesh[-2], mesh.mesh[-1])[0]
+    res[0, 0] += integrate_fun(lambda x:
+                               (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
+                                one_sided_hat_function_derivative(x, mesh.mesh[0], mesh.mesh[1], 1) *
+                                one_sided_hat_function_derivative(x, mesh.mesh[0], mesh.mesh[1], 1)), mesh.mesh[0],
+                               mesh.mesh[1])[0]
+    res[-1, -1] += integrate_fun(lambda x:
+                                 (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
+                                  one_sided_hat_function_derivative(x, mesh.mesh[-1], mesh.mesh[-2], 1) *
+                                  one_sided_hat_function_derivative(x, mesh.mesh[-1], mesh.mesh[-2], 1)),
+                                 mesh.mesh[-2], mesh.mesh[-1])[0]
 
     for i in range(1, mesh.mesh.size):
         if i < mesh.mesh.size - 1:
-            res[i, i] += integrate.quad(lambda x:
-                                        (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
-                                         two_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
-                                                                           mesh.mesh[i + 1], 1) *
-                                         two_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
-                                                                           mesh.mesh[i + 1], 1)), mesh.mesh[i - 1],
-                                        mesh.mesh[i + 1])[0]
-        res[i, i - 1] += integrate.quad(lambda x: (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
-                                                   one_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
-                                                                                     1) *
-                                                   one_sided_hat_function_derivative(x, mesh.mesh[i], mesh.mesh[i - 1],
-                                                                                     1)
-                                                   ), mesh.mesh[i - 1], mesh.mesh[i])[0]
+            res[i, i] += integrate_fun(lambda x:
+                                       (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
+                                        two_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
+                                                                          mesh.mesh[i + 1], 1) *
+                                        two_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
+                                                                          mesh.mesh[i + 1], 1)), mesh.mesh[i - 1],
+                                       mesh.mesh[i + 1])[0]
+        res[i, i - 1] += integrate_fun(lambda x: (get_rode_cross_section_area(x) * get_rode_conductivity(x) *
+                                                  one_sided_hat_function_derivative(x, mesh.mesh[i - 1], mesh.mesh[i],
+                                                                                    1) *
+                                                  one_sided_hat_function_derivative(x, mesh.mesh[i], mesh.mesh[i - 1],
+                                                                                    1)
+                                                  ), mesh.mesh[i - 1], mesh.mesh[i])[0]
         res[i - 1, i] = res[i, i - 1]
     return res
 
 
-def get_load_vector(fun, mesh):
+def get_load_vector(fun, mesh, integrate_fun, t=0):
     res = np.zeros(mesh.mesh.size)
-    res[0] = integrate.quad(lambda x: (fun(x) * one_sided_hat_function(x, mesh.mesh[0], mesh.mesh[1], 1)), mesh.mesh[0],
-                            mesh.mesh[1])[0]
-    res[-1] = integrate.quad(lambda x: (fun(x) * one_sided_hat_function(x, mesh.mesh[-1], mesh.mesh[-2], 1)),
-                             mesh.mesh[-2], mesh.mesh[-1])[0]
+    res[0] = \
+    integrate_fun(lambda x: (fun(x, t) * one_sided_hat_function(x, mesh.mesh[0], mesh.mesh[1], 1)), mesh.mesh[0],
+                  mesh.mesh[1])[0]
+    res[-1] = integrate_fun(lambda x: (fun(x, t) * one_sided_hat_function(x, mesh.mesh[-1], mesh.mesh[-2], 1)),
+                            mesh.mesh[-2], mesh.mesh[-1])[0]
     for i in range(mesh.mesh.size - 1):
-        res[i] += integrate.quad(
-            lambda x: (fun(x) * two_sided_hat_function(x, mesh.mesh[i - 1], mesh.mesh[i], mesh.mesh[i + 1], 1)),
+        res[i] += integrate_fun(
+            lambda x: (fun(x, t) * two_sided_hat_function(x, mesh.mesh[i - 1], mesh.mesh[i], mesh.mesh[i + 1], 1)),
             mesh.mesh[i - 1], mesh.mesh[i + 1])[0]
     return res
 
@@ -135,47 +146,64 @@ def get_piecewise_linear_function(mesh: Mesh, coeffs: np.ndarray):
     return res_fun
 
 
-def compute_l2_projection(fun: Callable[[float], float], mesh: Mesh):
+def compute_l2_projection(fun: Callable[[float], float], mesh: Mesh, t=0):
     mass_matrix = get_mass_matrix(mesh)
-    load_vector = get_load_vector(fun, mesh)
+    load_vector = get_load_vector(fun, mesh, integrate.quad, t)
     projection_coefficients = np.linalg.solve(mass_matrix, load_vector)
-    return get_piecewise_linear_function(mesh, projection_coefficients)
+    return (get_piecewise_linear_function(mesh, projection_coefficients), projection_coefficients)
 
 
 def add_boundary_conditions(stiffness_matrix, load_vector, kappa_0, kappa_n, g_0, g_n):
-    # load_vector[0] += kappa_0 * g_0
-    # load_vector[-1] += kappa_n * g_n
-    # stiffness_matrix[0, 0] += kappa_0
-    # stiffness_matrix[-1, -1] += kappa_n
-    stiffness_matrix[0, 0] = 1
-    stiffness_matrix[0, 1] = 0
-    stiffness_matrix[-1, -1] = 1
-    stiffness_matrix[-1, -2] = 0
-    load_vector[0] = 0
-    load_vector[-1] = 0
+    load_vector[0] += kappa_0 * g_0
+    load_vector[-1] += kappa_n * g_n
+    stiffness_matrix[0, 0] += kappa_0
+    stiffness_matrix[-1, -1] += kappa_n
+    # stiffness_matrix[0, 0] = 1
+    # stiffness_matrix[0, 1] = 0
+    # stiffness_matrix[-1, -1] = 1
+    # stiffness_matrix[-1, -2] = 0
+    # load_vector[0] = 0
+    # load_vector[-1] = 0
     return stiffness_matrix, load_vector
 
 
 def get_heat_equation_solution(f, kappa_0, kappa_n, g_0, g_n, mesh):
-    stiffness_matrix = get_stiffness_matrix(mesh)
-    load_vector = get_load_vector(f, mesh)
-    print(stiffness_matrix)
+    stiffness_matrix = get_stiffness_matrix(mesh, integrate.quad)
+    load_vector = get_load_vector(f, mesh, integrate.quad)
     (stiffness_matrix, load_vector) = add_boundary_conditions(stiffness_matrix, load_vector, kappa_0, kappa_n, g_0, g_n)
-    print(stiffness_matrix)
     projection_coefficients = np.linalg.solve(stiffness_matrix, load_vector)
     return get_piecewise_linear_function(mesh, projection_coefficients)
 
 
+def get_time_dependent_heat_equation_solution(f, kappa_0, kappa_n, g_0, g_n, mesh, time_partition):
+    res = []
+    stiffness_matrix = get_stiffness_matrix(mesh, integrate.quad)
+    mass_matrix = get_mass_matrix(mesh)
+    load_vector = get_load_vector(f, mesh, integrate.quad, time_partition[0])
+    (stiffness_matrix, load_vector) = add_boundary_conditions(stiffness_matrix, load_vector, kappa_0, kappa_n, g_0, g_n)
+    x0 = compute_l2_projection(get_initial_temperature, mesh, time_partition[0])[1]
+    res.append(x0)
+    for i in range(1, len(time_partition)):
+        res.append(FDM.backward_euler_one_iteration(mass_matrix, stiffness_matrix, load_vector, res[-1],
+                                                    time_partition[i] - time_partition[i - 1]))
+    return res
+
+
+def animate_solution(functions, start, stop, num_of_points):
+    fig, ax = plt.subplots()
+    artists = []
+    lin = np.linspace(start, stop, num_of_points)
+    for i in range(len(functions)):
+        container = ax.plot(lin, get_piecewise_linear_function(mesh, functions[i])(lin), color="blue")
+        artists.append(container)
+    ani = animation.ArtistAnimation(fig=fig, artists=artists, interval=50)
+    ani.save(filename="/home/szymon/PycharmProjects/FEMSolver/animation.gif", writer="pillow")
+
+
 if __name__ == "__main__":
-    boundary = OneDimensionalBoundary(0, 6)
-    # mesh = Mesh(boundary, h=1)
-    mesh = Mesh(boundary, h=0.1)
+    boundary = OneDimensionalBoundary(0, 1)
+    mesh = Mesh(boundary, h=0.01)
     np.set_printoptions(linewidth=np.inf)
-    projection = compute_l2_projection(np.sin, mesh)
-    rod_temp = get_heat_equation_solution(get_heat_source_function, 1000000, 0, -1, 0, mesh)
-    lin = np.linspace(0, 6, 1000)
-    plt.subplot(2, 1, 1)
-    plt.plot(lin, rod_temp(lin))
-    plt.subplot(2, 1, 2)
-    plt.plot(lin, get_heat_source_function(lin))
-    plt.show()
+    lin = np.linspace(0, 1, 100)
+    rod_temps = get_time_dependent_heat_equation_solution(get_heat_source_function, 1000000, 1000000, 0, 0, mesh, lin)
+    animate_solution(rod_temps, 0, 1, 50)
