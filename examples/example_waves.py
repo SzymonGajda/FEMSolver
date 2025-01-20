@@ -66,5 +66,5 @@ if __name__ == "__main__":
         100,
         vertices,
         triangles,
-        path_to_save="/home/szymon/PycharmProjects/FEMSolver/animation12.gif",
+        path_to_save="/home/FEMAnimations/waves.gif",
     )

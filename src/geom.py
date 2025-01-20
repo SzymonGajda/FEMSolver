@@ -8,7 +8,7 @@ Point2d: TypeAlias = tuple[float, float]
 
 
 def is_inside_triangle(
-    node1: Point2d, node2: Point2d, node3: Point2d, point: Point2d
+    vertex1: Point2d, vertex2: Point2d, vertex3: Point2d, point: Point2d
 ) -> np.typing.NDArray[np.bool_]:
     """
     Determine whether a given point lies inside a triangle defined by three vertices
@@ -17,11 +17,11 @@ def is_inside_triangle(
     an array of boolean values where True indicates the point lies inside the
     triangle or on its edges, and False otherwise.
 
-    :param node1: The first vertex of the triangle, specified as a 2D point with x
+    :param vertex1: The first vertex of the triangle, specified as a 2D point with x
                   and y coordinates.
-    :param node2: The second vertex of the triangle, specified as a 2D point with
+    :param vertex2: The second vertex of the triangle, specified as a 2D point with
                   x and y coordinates.
-    :param node3: The third vertex of the triangle, specified as a 2D point with x
+    :param vertex3: The third vertex of the triangle, specified as a 2D point with x
                   and y coordinates.
     :param point: The point to be tested, also specified as a 2D point with x and
                   y coordinates.
@@ -33,18 +33,18 @@ def is_inside_triangle(
         """Check if a value is close to 0 or positive."""
         return np.logical_or(np.isclose(value, 0.0), value > 0.0)
 
-    denominator = (node2[1] - node3[1]) * (node1[0] - node3[0]) + (
-        node3[0] - node2[0]
-    ) * (node1[1] - node3[1])
+    denominator = (vertex2[1] - vertex3[1]) * (vertex1[0] - vertex3[0]) + (
+            vertex3[0] - vertex2[0]
+    ) * (vertex1[1] - vertex3[1])
 
     alpha = (
-        (node2[1] - node3[1]) * (point[0] - node3[0])
-        + (node3[0] - node2[0]) * (point[1] - node3[1])
+                    (vertex2[1] - vertex3[1]) * (point[0] - vertex3[0])
+                    + (vertex3[0] - vertex2[0]) * (point[1] - vertex3[1])
     ) / denominator
 
     beta = (
-        (node3[1] - node1[1]) * (point[0] - node3[0])
-        + (node1[0] - node3[0]) * (point[1] - node3[1])
+                   (vertex3[1] - vertex1[1]) * (point[0] - vertex3[0])
+                   + (vertex1[0] - vertex3[0]) * (point[1] - vertex3[1])
     ) / denominator
 
     gamma = 1 - alpha - beta

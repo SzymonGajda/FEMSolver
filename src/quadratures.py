@@ -1,6 +1,7 @@
 """Module provides implementations of different quadratures algorithms."""
-import scipy
 from collections.abc import Callable
+
+import scipy
 
 from src.geom import Point2d, get_triangle_area
 

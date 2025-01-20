@@ -1,4 +1,3 @@
-import pytest
 from src.geom import get_triangle_area, is_inside_triangle
 import numpy as np
 

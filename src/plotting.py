@@ -8,7 +8,6 @@ from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-
 def animate(functions, x0, xn, num_of_points, mesh, path_to_save):
     """
     Generates and saves an animation by visualizing multiple one
